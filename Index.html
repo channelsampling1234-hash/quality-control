@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Aplikasi P5M & Checklist Tools — PT Ganda Alam Makmur">
+  <title>Aplikasi P5M & Checklist Tools - PT Ganda Alam Makmur</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+
+  <!-- Localhost: CSS file langsung -->
+  <link rel="stylesheet" href="style.css">
+  <!-- GAS: include CSS dari template -->
+  <?!= include('Style'); ?>
+</head>
+<body>
+
+  <!-- ====== TOP HEADER BAR ====== -->
+  <header class="top-header">
+    <img
+      src="logo_ptgam.png"
+      onerror="this.src='https://drive.google.com/thumbnail?id=1JCi_PDq90LVUBBYmgXMtRBIR9HeVqGk4&sz=w1000'"
+      alt="Logo PT GAM"
+      class="top-header-logo"
+    >
+    <div class="top-header-divider"></div>
+    <span class="top-header-title">PT Ganda Alam Makmur</span>
+    <div class="top-header-divider"></div>
+    <span class="top-header-sub">Operations Management System</span>
+    <div class="top-header-dot" style="margin-left:auto;"></div>
+    <span class="top-header-status">LIVE</span>
+  </header>
+
+  <!-- ====== APP WRAPPER ====== -->
+  <div class="app-wrapper">
+
+    <!-- ====== SIDEBAR ====== -->
+    <aside class="sidebar">
+      <span class="sidebar-section-label">Navigation</span>
+
+      <button
+        class="nav-item active"
+        id="p5m-tab"
+        data-bs-toggle="pill"
+        data-bs-target="#p5m"
+        type="button"
+        role="tab"
+      >
+        <i class="bi bi-person-check"></i>
+        P5M Absensi
+      </button>
+
+      <button
+        class="nav-item"
+        id="checklist-tab"
+        data-bs-toggle="pill"
+        data-bs-target="#checklist"
+        type="button"
+        role="tab"
+      >
+        <i class="bi bi-tools"></i>
+        Checklist Tools
+      </button>
+
+      <div style="height:1px;background:var(--gold-border);margin:12px 0;"></div>
+      <span class="sidebar-section-label">Laporan</span>
+
+      <button
+        class="nav-item"
+        id="datap5m-tab"
+        data-bs-toggle="pill"
+        data-bs-target="#datap5m"
+        type="button"
+        role="tab"
+      >
+        <i class="bi bi-table"></i>
+        Data P5M
+      </button>
+
+      <!-- Watermark -->
+      <img
+        src="logo_watermark.png"
+        onerror="this.src='https://drive.google.com/thumbnail?id=1fL10QE6Jqx4jhZn_dOQHpBQHGLe2rlhi&sz=w1000'"
+        alt=""
+        class="sidebar-watermark"
+      >
+    </aside>
+
+    <!-- ====== MAIN CONTENT ====== -->
+    <main class="main-content">
+
+      <!-- ENV Banner (localhost only) -->
+      <div id="env-banner" class="env-banner">
+        <i class="bi bi-pc-display"></i>
+        <strong>Mode Localhost</strong> &mdash; Data disimpan ke <code>Supabase</code>, tidak terhubung ke Google Apps Script.
+      </div>
+
+      <!-- Tab Content -->
+      <div class="tab-content" id="mainTabContent">
+
+        <!-- ====== TAB 1: P5M ABSENSI ====== -->
+        <div class="tab-pane fade show active" id="p5m" role="tabpanel">
+
+          <div class="page-title">Form Input</div>
+          <div class="page-subtitle">Absensi P5M Harian</div>
+
+          <div class="card-premium">
+            <!-- Card Header -->
+            <div class="card-header-premium">
+              <div class="card-header-left">
+                <img
+                  src="logo_ptgam.png"
+                  onerror="this.src='https://drive.google.com/thumbnail?id=1JCi_PDq90LVUBBYmgXMtRBIR9HeVqGk4&sz=w1000'"
+                  alt="Logo PT GAM"
+                  class="header-logo"
+                >
+                <span class="card-header-title">Form Absensi P5M</span>
+              </div>
+              <span class="badge-premium">PT. Ganda Alam Makmur</span>
+            </div>
+
+            <!-- Card Body -->
+            <div class="card-body-premium">
+              <form id="formP5M">
+
+                <!-- Section: Informasi Dasar -->
+                <div class="form-section">
+                  <div class="form-section-label"><i class="bi bi-calendar3 me-1"></i>Informasi Dasar</div>
+
+                  <div class="mb-3">
+                    <label class="form-label-premium">Tanggal</label>
+                    <input type="date" class="form-control-premium" id="p5m_tanggal" required>
+                  </div>
+
+                  <div class="mb-3">
+                    <label class="form-label-premium">Nama Karyawan</label>
+                    <select class="form-select-premium form-control-premium" id="p5m_nama" required onchange="onSelectKaryawanP5M()">
+                      <option value="">— Pilih Karyawan —</option>
+                    </select>
+                  </div>
+
+                  <div class="row g-3 mb-3">
+                    <div class="col-6">
+                      <label class="form-label-premium">NIK</label>
+                      <input type="text" class="form-control-premium" id="p5m_nik" readonly>
+                    </div>
+                    <div class="col-6">
+                      <label class="form-label-premium">Jabatan</label>
+                      <input type="text" class="form-control-premium" id="p5m_jabatan" readonly>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Materi P5M (Foreman only) -->
+                <div class="mb-3 d-none group-materi" id="group_materi">
+                  <div class="form-divider"></div>
+                  <label class="form-label-premium" style="color:var(--emerald);">
+                    <i class="bi bi-journal-text me-1"></i>Materi P5M
+                    <span style="font-size:0.6rem;opacity:0.7;margin-left:6px;">KHUSUS FOREMAN</span>
+                  </label>
+                  <textarea class="form-control-premium" id="p5m_materi" rows="2" placeholder="Masukkan topik / materi pembicaraan..."></textarea>
+                  <div class="form-divider"></div>
+                </div>
+
+                <!-- Section: Kondisi Kesehatan -->
+                <div class="form-section">
+                  <div class="form-section-label"><i class="bi bi-heart-pulse me-1"></i>Kondisi Kesehatan</div>
+
+                  <div class="mb-3">
+                    <label class="form-label-premium">Jam Tidur Semalam</label>
+                    <input type="number" step="0.5" class="form-control-premium" id="p5m_jamTidur" required placeholder="Contoh: 7">
+                  </div>
+
+                  <div class="mb-3">
+                    <label class="form-label-premium">Status Kesehatan</label>
+                    <select class="form-select-premium form-control-premium" id="p5m_statusKesehatan" required onchange="toggleHealthNote()">
+                      <option value="Fit">Fit / Sehat</option>
+                      <option value="Kurang Fit">Kurang Fit / Sakit</option>
+                    </select>
+                  </div>
+
+                  <div class="mb-3">
+                    <label class="form-label-premium">Konsumsi Obat</label>
+                    <select class="form-select-premium form-control-premium" id="p5m_isKonsumsiObat" required onchange="toggleObatNote()">
+                      <option value="Tidak">Tidak</option>
+                      <option value="Ya">Ya</option>
+                    </select>
+                  </div>
+
+                  <!-- Rincian Obat / Keluhan -->
+                  <div class="d-none" id="group_keluhan">
+                    <div class="mb-3 field-warning">
+                      <label class="form-label-premium">Rincian Obat / Keluhan</label>
+                      <input type="text" class="form-control-premium" id="p5m_rincianObat" placeholder="Nama obat yang dikonsumsi / keluhan">
+                    </div>
+                    <div class="mb-3 field-warning">
+                      <label class="form-label-premium">Tindakan Pengawas</label>
+                      <input type="text" class="form-control-premium" id="p5m_tindakanPengawas" placeholder="Tindakan / Istirahat / Rujukan">
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Section: TTD & Submit -->
+                <div class="form-section">
+                  <div class="form-section-label"><i class="bi bi-pen me-1"></i>Catatan & Tanda Tangan</div>
+
+                  <div class="mb-3">
+                    <label class="form-label-premium">Catatan Tambahan</label>
+                    <textarea class="form-control-premium" id="p5m_catatan" rows="2" placeholder="Opsional..."></textarea>
+                  </div>
+
+                  <div class="mb-4">
+                    <label class="form-label-premium">Tanda Tangan Digital</label>
+                    <div class="signature-wrapper">
+                      <canvas id="pad_p5m" class="signature-pad"></canvas>
+                      <div class="signature-hint">Tanda tangan di sini</div>
+                    </div>
+                    <button type="button" class="btn-clear-sig" onclick="clearSignature('pad_p5m')">
+                      <i class="bi bi-eraser"></i> Bersihkan TTD
+                    </button>
+                  </div>
+
+                  <button type="submit" class="btn-submit-premium btn-p5m-premium" id="btnSubmitP5M">
+                    <i class="bi bi-send-check me-2"></i>Submit P5M
+                  </button>
+                </div>
+
+              </form>
+            </div>
+          </div>
+        </div><!-- /tab P5M -->
+
+        <!-- ====== TAB 2: CHECKLIST TOOLS ====== -->
+        <div class="tab-pane fade" id="checklist" role="tabpanel">
+
+          <div class="page-title">Form Input</div>
+          <div class="page-subtitle">Checklist Tools & APD</div>
+
+          <div class="card-premium">
+            <div class="card-header-premium">
+              <div class="card-header-left">
+                <img
+                  src="logo_ptgam.png"
+                  onerror="this.src='https://drive.google.com/thumbnail?id=1JCi_PDq90LVUBBYmgXMtRBIR9HeVqGk4&sz=w1000'"
+                  alt="Logo PT GAM"
+                  class="header-logo"
+                >
+                <span class="card-header-title">Form Checklist</span>
+              </div>
+              <span class="badge-premium">PT. Ganda Alam Makmur</span>
+            </div>
+
+            <div class="card-body-premium">
+              <form id="formChecklist">
+
+                <div class="form-section">
+                  <div class="form-section-label"><i class="bi bi-calendar3 me-1"></i>Informasi Pemeriksaan</div>
+
+                  <div class="mb-3">
+                    <label class="form-label-premium">Tanggal</label>
+                    <input type="date" class="form-control-premium" id="chk_tanggal" required>
+                  </div>
+
+                  <div class="mb-3">
+                    <label class="form-label-premium">Area Kerja / Unit</label>
+                    <input type="text" class="form-control-premium" id="chk_area" required placeholder="Contoh: Workshop / Pit A">
+                  </div>
+
+                  <div class="mb-3">
+                    <label class="form-label-premium">Nama Pemeriksa / Operator</label>
+                    <select class="form-select-premium form-control-premium" id="chk_nama" required onchange="onSelectKaryawanChecklist()">
+                      <option value="">— Pilih Karyawan —</option>
+                    </select>
+                  </div>
+
+                  <div class="mb-3">
+                    <label class="form-label-premium">NIK</label>
+                    <input type="text" class="form-control-premium" id="chk_nik" readonly>
+                  </div>
+                </div>
+
+                <!-- Daftar Tools -->
+                <div class="form-section">
+                  <div class="form-section-label"><i class="bi bi-list-check me-1"></i>Daftar Tools yang Diperiksa</div>
+                  <div id="container_tools_list" class="tools-container-premium">
+                    <div class="tools-loading">
+                      <div class="spinner-border spinner-border-sm text-warning" role="status"></div>
+                      Memuat daftar tools...
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Catatan & TTD -->
+                <div class="form-section">
+                  <div class="form-section-label"><i class="bi bi-pen me-1"></i>Catatan & Tanda Tangan</div>
+
+                  <div class="mb-3">
+                    <label class="form-label-premium">Catatan Kerusakan / Keterangan</label>
+                    <textarea class="form-control-premium" id="chk_catatan" rows="2" placeholder="Deskripsi kerusakan jika ada..."></textarea>
+                  </div>
+
+                  <div class="mb-4">
+                    <label class="form-label-premium">Tanda Tangan Digital Pemeriksa</label>
+                    <div class="signature-wrapper">
+                      <canvas id="pad_chk" class="signature-pad"></canvas>
+                      <div class="signature-hint">Tanda tangan di sini</div>
+                    </div>
+                    <button type="button" class="btn-clear-sig" onclick="clearSignature('pad_chk')">
+                      <i class="bi bi-eraser"></i> Bersihkan TTD
+                    </button>
+                  </div>
+
+                  <button type="submit" class="btn-submit-premium btn-chk-premium" id="btnSubmitChecklist">
+                    <i class="bi bi-patch-check me-2"></i>Submit Checklist
+                  </button>
+                </div>
+
+              </form>
+            </div>
+          </div>
+        </div><!-- /tab Checklist -->
+
+        <!-- ====== TAB 3: DATA P5M ====== -->
+        <div class="tab-pane fade" id="datap5m" role="tabpanel">
+
+          <div class="page-title">Laporan</div>
+          <div class="page-subtitle">Data P5M Tersimpan</div>
+
+          <!-- Filter Bar -->
+          <div class="card-premium mb-4" style="padding:16px 20px;">
+            <div class="d-flex align-items-end gap-3 flex-wrap">
+              <div>
+                <label class="form-label-premium mb-1">Dari Tanggal</label>
+                <input type="date" class="form-control-premium" id="filter_dari" style="width:160px;">
+              </div>
+              <div>
+                <label class="form-label-premium mb-1">Sampai Tanggal</label>
+                <input type="date" class="form-control-premium" id="filter_sampai" style="width:160px;">
+              </div>
+              <button onclick="loadDataP5M()" class="btn-submit-premium btn-p5m-premium" style="width:auto;padding:10px 24px;margin-top:0;">
+                <i class="bi bi-search me-2"></i>Tampilkan Data
+              </button>
+            </div>
+          </div>
+
+          <!-- Table Card -->
+          <div class="card-premium">
+            <div class="card-header-premium">
+              <div class="card-header-left">
+                <i class="bi bi-table" style="color:var(--gold);font-size:1rem;"></i>
+                <span class="card-header-title">Rekap Absensi P5M</span>
+              </div>
+              <span id="datap5m_count" class="badge-premium">— data</span>
+            </div>
+            <div class="card-body-premium" style="padding:0;">
+              <div id="datap5m_loading" style="display:none;" class="tools-loading py-5">
+                <div class="spinner-border spinner-border-sm" style="color:var(--gold);"></div>
+                Memuat data dari Supabase...
+              </div>
+              <div id="datap5m_empty" style="display:none;padding:40px;text-align:center;color:var(--text-muted);font-size:0.82rem;font-family:'Outfit',sans-serif;letter-spacing:0.06em;">
+                <i class="bi bi-inbox" style="font-size:2rem;display:block;margin-bottom:10px;color:var(--gold-border);"></i>
+                Belum ada data P5M ditemukan.
+              </div>
+              <div class="table-responsive" id="datap5m_table_wrapper" style="display:none;">
+                <table class="table-data-p5m w-100" id="datap5m_table">
+                  <thead>
+                    <tr>
+                      <th>No</th>
+                      <th>Tanggal</th>
+                      <th>Nama</th>
+                      <th>NIK</th>
+                      <th>Jabatan</th>
+                      <th>Jam Tidur</th>
+                      <th>Kesehatan</th>
+                      <th>Konsumsi Obat</th>
+                      <th>Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody id="datap5m_tbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /tab Data P5M -->
+
+      </div><!-- /tab-content -->
+
+    </main>
+  </div><!-- /app-wrapper -->
+
+  <!-- ====== MODAL PREVIEW P5M ====== -->
+  <div id="modal-p5m-preview" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.8);backdrop-filter:blur(8px);overflow-y:auto;padding:24px 16px;">
+    <div style="max-width:720px;margin:0 auto;background:var(--obsidian-2);border:1px solid var(--gold-border);border-radius:var(--radius-xl);overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,0.8);">
+
+      <!-- Modal Header -->
+      <div style="background:var(--obsidian);border-bottom:1px solid var(--gold-border);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <img src="logo_ptgam.png" onerror="this.src='https://drive.google.com/thumbnail?id=1JCi_PDq90LVUBBYmgXMtRBIR9HeVqGk4&sz=w1000'" style="height:28px;background:rgba(255,255,255,0.9);padding:2px 6px;border-radius:4px;">
+          <div>
+            <div style="font-family:'Outfit',sans-serif;font-size:0.6rem;font-weight:700;letter-spacing:0.16em;color:var(--gold);text-transform:uppercase;">PT Ganda Alam Makmur</div>
+            <div style="font-family:'Outfit',sans-serif;font-size:0.9rem;font-weight:600;color:var(--text-primary);">Detail Laporan P5M Harian</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;">
+          <button onclick="downloadPDFP5M(window._previewRow)" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:var(--gold-dim);border:1px solid var(--gold-border);border-radius:var(--radius-sm);color:var(--gold);font-family:'Outfit',sans-serif;font-size:0.72rem;font-weight:700;letter-spacing:0.08em;cursor:pointer;transition:var(--transition);">
+            <i class="bi bi-file-earmark-pdf"></i> Download PDF
+          </button>
+          <button onclick="closePreview()" style="width:32px;height:32px;border-radius:50%;border:1px solid rgba(201,169,110,0.2);background:transparent;color:var(--text-muted);font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:var(--transition);" onmouseover="this.style.borderColor='var(--gold)';this.style.color='var(--gold)'" onmouseout="this.style.borderColor='rgba(201,169,110,0.2)';this.style.color='var(--text-muted)'">&times;</button>
+        </div>
+      </div>
+
+      <!-- Modal Body -->
+      <div style="padding:24px 28px;" id="modal-p5m-body">
+
+        <!-- No Dokumen -->
+        <div style="font-family:'Outfit',sans-serif;font-size:0.65rem;color:var(--text-muted);letter-spacing:0.1em;margin-bottom:20px;" id="prev_nodoc"></div>
+
+        <!-- Section: Informasi Karyawan -->
+        <div style="font-family:'Outfit',sans-serif;font-size:0.6rem;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:12px;display:flex;align-items:center;gap:8px;"><i class="bi bi-person-badge"></i> Informasi Karyawan <span style="flex:1;height:1px;background:var(--gold-border);display:inline-block;"></span></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:20px;">
+          <div class="prev-field"><div class="prev-label">Tanggal</div><div class="prev-value" id="prev_tanggal"></div></div>
+          <div class="prev-field"><div class="prev-label">Nama Karyawan</div><div class="prev-value" id="prev_nama"></div></div>
+          <div class="prev-field"><div class="prev-label">NIK</div><div class="prev-value" id="prev_nik"></div></div>
+          <div class="prev-field"><div class="prev-label">Jabatan</div><div class="prev-value" id="prev_jabatan"></div></div>
+          <div class="prev-field" style="grid-column:span 2;"><div class="prev-label">Materi P5M</div><div class="prev-value" id="prev_materi"></div></div>
+        </div>
+
+        <!-- Section: Kondisi Kesehatan -->
+        <div style="font-family:'Outfit',sans-serif;font-size:0.6rem;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:12px;display:flex;align-items:center;gap:8px;"><i class="bi bi-heart-pulse"></i> Kondisi Kesehatan <span style="flex:1;height:1px;background:var(--gold-border);display:inline-block;"></span></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:16px;margin-bottom:20px;">
+          <div class="prev-field"><div class="prev-label">Jam Tidur</div><div class="prev-value" id="prev_jamtidur"></div></div>
+          <div class="prev-field"><div class="prev-label">Status Kesehatan</div><div class="prev-value" id="prev_kesehatan"></div></div>
+          <div class="prev-field"><div class="prev-label">Konsumsi Obat</div><div class="prev-value" id="prev_obat"></div></div>
+          <div class="prev-field"><div class="prev-label">Rincian Obat</div><div class="prev-value" id="prev_rincian"></div></div>
+          <div class="prev-field" style="grid-column:span 4;"><div class="prev-label">Tindakan Pengawas</div><div class="prev-value" id="prev_tindakan"></div></div>
+        </div>
+
+        <!-- Section: Catatan -->
+        <div style="font-family:'Outfit',sans-serif;font-size:0.6rem;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:12px;display:flex;align-items:center;gap:8px;"><i class="bi bi-journal-text"></i> Catatan <span style="flex:1;height:1px;background:var(--gold-border);display:inline-block;"></span></div>
+        <div class="prev-field" style="margin-bottom:20px;"><div class="prev-value" id="prev_catatan" style="min-height:40px;"></div></div>
+
+        <!-- Section: TTD -->
+        <div style="font-family:'Outfit',sans-serif;font-size:0.6rem;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:12px;display:flex;align-items:center;gap:8px;"><i class="bi bi-pen"></i> Tanda Tangan Karyawan <span style="flex:1;height:1px;background:var(--gold-border);display:inline-block;"></span></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;">
+          <div>
+            <div style="border:1px solid var(--gold-border);border-radius:var(--radius-md);overflow:hidden;background:rgba(255,255,255,0.95);height:120px;display:flex;align-items:center;justify-content:center;">
+              <img id="prev_signature" src="" style="max-width:100%;max-height:100%;object-fit:contain;" onerror="this.style.display='none'">
+              <span id="prev_sig_empty" style="font-size:0.72rem;color:#aaa;display:none;">Tidak ada tanda tangan</span>
+            </div>
+            <div style="font-size:0.7rem;color:var(--text-muted);margin-top:6px;font-family:'Outfit',sans-serif;" id="prev_sig_nama"></div>
+          </div>
+          <div style="display:flex;flex-direction:column;justify-content:flex-end;">
+            <div style="font-size:0.65rem;color:var(--text-muted);font-family:'Outfit',sans-serif;margin-bottom:4px;">ID Dokumen</div>
+            <div style="font-size:0.75rem;color:var(--gold);font-family:'Outfit',monospace;word-break:break-all;" id="prev_docid"></div>
+          </div>
+        </div>
+
+        <!-- Section: Approval Pengawas -->
+        <div style="border-top:1px solid var(--gold-border);padding-top:20px;">
+          <div style="font-family:'Outfit',sans-serif;font-size:0.6rem;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:16px;display:flex;align-items:center;gap:8px;"><i class="bi bi-patch-check"></i> ✦ Persetujuan & Approval Pengawas <span style="flex:1;height:1px;background:var(--gold-border);display:inline-block;"></span></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;">
+            <div style="border:1px solid var(--gold-border);border-radius:var(--radius-md);padding:16px;min-height:100px;background:rgba(4,9,10,0.6);">
+              <div style="font-family:'Outfit',sans-serif;font-size:0.6rem;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px;">Nama Pengawas</div>
+              <div style="height:1px;background:var(--gold-border);margin-bottom:8px;"></div>
+              <div style="height:1px;background:var(--gold-border);margin-bottom:8px;"></div>
+              <div style="height:1px;background:var(--gold-border);"></div>
+            </div>
+            <div style="border:1px solid var(--gold-border);border-radius:var(--radius-md);padding:16px;min-height:100px;background:rgba(4,9,10,0.6);">
+              <div style="font-family:'Outfit',sans-serif;font-size:0.6rem;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px;">Tanda Tangan Pengawas</div>
+              <div style="height:60px;border:1px dashed var(--gold-border);border-radius:6px;margin-top:4px;"></div>
+            </div>
+            <div style="border:1px solid var(--gold-border);border-radius:var(--radius-md);padding:16px;min-height:100px;background:rgba(4,9,10,0.6);">
+              <div style="font-family:'Outfit',sans-serif;font-size:0.6rem;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px;">Tanggal Persetujuan</div>
+              <div style="height:1px;background:var(--gold-border);margin-bottom:8px;"></div>
+              <div style="height:1px;background:var(--gold-border);margin-bottom:8px;"></div>
+              <div style="height:1px;background:var(--gold-border);"></div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /modal body -->
+    </div>
+  </div><!-- /modal -->
+
+  <!-- Inline styles untuk prev-field -->
+  <style>
+    .prev-field { background:rgba(4,9,10,0.6);border:1px solid var(--gold-border);border-radius:var(--radius-sm);padding:10px 14px; }
+    .prev-label { font-family:'Outfit',sans-serif;font-size:0.6rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-muted);margin-bottom:5px; }
+    .prev-value { font-size:0.88rem;color:var(--text-primary);font-weight:500; }
+  </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.0.0/dist/signature_pad.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <!-- Localhost -->
+  <script src="script.js"></script>
+  <!-- GAS -->
+  <?!= include('JavaScript'); ?>
+</body>
+</html>
