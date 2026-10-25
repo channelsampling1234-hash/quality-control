@@ -608,8 +608,20 @@ async function downloadPDFP5M(row) {
   const pembicara    = foremanNames.length > 0 ? foremanNames.join(', ') : '-';
   const hasForeman   = foremanNames.length > 0;
 
-  /* ---- Pengawas (non-foreman) ---- */
-  const pengawasRows = rows.filter(r => r.jabatan && !r.jabatan.toLowerCase().includes('foreman'));
+  /* ---- Helper: load image via fetch → base64 (bypass CORS canvas block) ---- */
+  async function loadImgAsDataUrl(url) {
+    try {
+      const resp = await fetch(url);
+      if (!resp.ok) return null;
+      const blob = await resp.blob();
+      return await new Promise(resolve => {
+        const reader = new FileReader();
+        reader.onload  = () => resolve(reader.result);
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(blob);
+      });
+    } catch(e) { return null; }
+  }
 
   /* ---- Tanggal ---- */
   const tgl     = new Date(row.tanggal + 'T00:00:00');
@@ -842,24 +854,18 @@ async function downloadPDFP5M(row) {
       const url = allFotoUrls[p] || null;
 
       if (url) {
-        try {
-          const fImg = new Image();
-          fImg.crossOrigin = 'anonymous';
-          fImg.src = url;
-          await new Promise(r => { fImg.onload = r; fImg.onerror = r; });
-          if (fImg.complete && fImg.naturalWidth > 0) {
-            const fc = document.createElement('canvas');
-            fc.width = fImg.naturalWidth; fc.height = fImg.naturalHeight;
-            fc.getContext('2d').drawImage(fImg, 0, 0);
-            doc.addImage(fc.toDataURL('image/jpeg'), 'JPEG', px, py, pW, pH, '', 'FAST');
-          } else {
-            // fallback placeholder
+        const dataUrl = await loadImgAsDataUrl(url);
+        if (dataUrl) {
+          try {
+            const ext = dataUrl.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+            doc.addImage(dataUrl, ext, px, py, pW, pH, '', 'FAST');
+          } catch(e) {
             doc.setDrawColor(...LGRAY); doc.setLineWidth(0.3);
             doc.setLineDashPattern([2,2],0); doc.rect(px, py, pW, pH); doc.setLineDashPattern([],0);
             doc.setFont('helvetica','italic'); doc.setFontSize(6); doc.setTextColor(...GRAY);
-            doc.text('[ Foto ]', px + pW/2, py + pH/2 + 2, { align:'center' });
+            doc.text('[ Foto gagal ]', px + pW/2, py + pH/2 + 2, { align:'center' });
           }
-        } catch(e) {
+        } else {
           doc.setDrawColor(...LGRAY); doc.setLineWidth(0.3);
           doc.setLineDashPattern([2,2],0); doc.rect(px, py, pW, pH); doc.setLineDashPattern([],0);
           doc.setFont('helvetica','italic'); doc.setFontSize(6); doc.setTextColor(...GRAY);
@@ -878,6 +884,7 @@ async function downloadPDFP5M(row) {
 
   /* ============================================================
      APPROVAL PENGAWAS
+     Pengawas = Foreman yang memimpin P5M (bisa lebih dari 1)
      ============================================================ */
   if (y + 50 > H - 15) { doc.addPage(); y = 14; }
 
@@ -887,12 +894,12 @@ async function downloadPDFP5M(row) {
   doc.text('Pengawas', margin, y + 6);
   y += 10;
 
-  // Determine jumlah kotak approval
-  const apRows   = pengawasRows.length > 0 ? pengawasRows.slice(0, 3) : [null];
-  const nAp      = apRows.length;
-  const apGap    = 5;
-  const apW      = (colW - apGap * (nAp - 1)) / nAp;
-  const apH      = 40;
+  // Gunakan foremanRows sebagai Pengawas (maks 3 kotak)
+  const apRows = foremanRows.length > 0 ? foremanRows.slice(0, 3) : [null];
+  const nAp    = apRows.length;
+  const apGap  = 5;
+  const apW    = (colW - apGap * (nAp - 1)) / nAp;
+  const apH    = 40;
 
   for (let ai = 0; ai < nAp; ai++) {
     const sr = apRows[ai];
@@ -902,23 +909,17 @@ async function downloadPDFP5M(row) {
     doc.setLineWidth(0.4);
     doc.rect(bx, y, apW, apH);
 
-    // Signature image
+    // Load & render signature via fetch (bukan canvas crossOrigin)
     if (sr && sr.signature_url) {
-      try {
-        const sImg = new Image();
-        sImg.crossOrigin = 'anonymous';
-        sImg.src = sr.signature_url;
-        await new Promise(r => { sImg.onload = r; sImg.onerror = r; });
-        if (sImg.complete && sImg.naturalWidth > 0) {
-          const sc = document.createElement('canvas');
-          sc.width = sImg.naturalWidth; sc.height = sImg.naturalHeight;
-          sc.getContext('2d').drawImage(sImg, 0, 0);
-          doc.addImage(sc.toDataURL('image/png'), 'PNG', bx + 2, y + 4, apW - 4, apH - 16, '', 'FAST');
-        }
-      } catch(e) {}
+      const sigDataUrl = await loadImgAsDataUrl(sr.signature_url);
+      if (sigDataUrl) {
+        try {
+          doc.addImage(sigDataUrl, 'PNG', bx + 2, y + 3, apW - 4, apH - 14, '', 'FAST');
+        } catch(e) {}
+      }
     }
 
-    // Name line at bottom of box
+    // Garis nama
     doc.setDrawColor(...LGRAY);
     doc.setLineWidth(0.2);
     doc.line(bx + 4, y + apH - 10, bx + apW - 4, y + apH - 10);
@@ -926,7 +927,12 @@ async function downloadPDFP5M(row) {
     doc.setFont('helvetica', sr && sr.nama ? 'bold' : 'normal');
     doc.setFontSize(7);
     doc.setTextColor(...BLACK);
-    doc.text(sr && sr.nama ? sr.nama : '(Nama Pengawas)', bx + apW / 2, y + apH - 5, { align: 'center' });
+    doc.text(
+      sr && sr.nama ? sr.nama : '(Nama Pengawas)',
+      bx + apW / 2,
+      y + apH - 5,
+      { align: 'center' }
+    );
   }
 
   y += apH + 10;
