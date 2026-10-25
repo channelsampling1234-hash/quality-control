@@ -480,227 +480,330 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 /* ==========================================
-   GENERATE PDF P5M — FORMAT A4 PREMIUM
+   GENERATE PDF P5M — FORM ABSENSI P5M (GROUP PER TANGGAL)
    ========================================== */
 async function downloadPDFP5M(row) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
   const W = 210, H = 297;
-  const margin = 18;
+  const margin = 14;
   const colW = W - margin * 2;
 
   /* ---- Warna ---- */
-  const DARK    = [4, 13, 11];
-  const GOLD    = [201, 169, 110];
-  const EMERALD = [46, 204, 142];
   const WHITE   = [255, 255, 255];
-  const GRAY    = [140, 155, 150];
-  const LGRAY   = [220, 230, 225];
-  const BLACK   = [20, 30, 25];
+  const BLACK   = [20, 20, 20];
+  const GRAY    = [120, 120, 120];
+  const GOLD    = [180, 120, 30];
+  const LGRAY   = [210, 210, 210];
+  const DKGREEN = [0, 80, 40];
 
-  /* ---- HEADER BG ---- */
-  doc.setFillColor(...DARK);
-  doc.rect(0, 0, W, 38, 'F');
-  // Gold line bawah header
-  doc.setFillColor(...GOLD);
-  doc.rect(0, 38, W, 0.8, 'F');
+  /* ============================================================
+     AMBIL SEMUA DATA P5M PADA TANGGAL YANG SAMA
+     ============================================================ */
+  const { data: allRows } = await _supa
+    .from('data_p5m')
+    .select('*')
+    .eq('tanggal', row.tanggal)
+    .order('created_at', { ascending: true });
 
-  /* ---- LOGO ---- */
+  const rows = (allRows && allRows.length > 0) ? allRows : [row];
+
+  /* ---- Foreman & Materi ---- */
+  const foremanRows  = rows.filter(r => r.jabatan && r.jabatan.toLowerCase().includes('foreman'));
+  const foremanNames = [...new Set(foremanRows.map(r => r.nama).filter(Boolean))];
+  const uniqueMateri = [...new Set(foremanRows.map(r => (r.materi || '').trim()).filter(Boolean))];
+  const materiText   = uniqueMateri.length > 0 ? uniqueMateri.join('; ') : '-';
+  const pembicara    = foremanNames.length > 0 ? foremanNames.join(', ') : '-';
+  const hasForeman   = foremanNames.length > 0;
+
+  /* ---- Pengawas (non-foreman) ---- */
+  const pengawasRows = rows.filter(r => r.jabatan && !r.jabatan.toLowerCase().includes('foreman'));
+
+  /* ---- Tanggal ---- */
+  const tgl     = new Date(row.tanggal + 'T00:00:00');
+  const HARI    = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+  const tglStr  = `${HARI[tgl.getDay()]}, ${tgl.toLocaleDateString('id-ID',{day:'2-digit',month:'long',year:'numeric'})}`;
+
+  /* ============================================================
+     HEADER
+     ============================================================ */
+  // Logo
   try {
     const logoImg = new Image();
     logoImg.src = 'logo_ptgam.png';
     await new Promise(res => { logoImg.onload = res; logoImg.onerror = res; });
     if (logoImg.complete && logoImg.naturalWidth > 0) {
-      const canvas = document.createElement('canvas');
-      canvas.width = logoImg.naturalWidth;
-      canvas.height = logoImg.naturalHeight;
-      canvas.getContext('2d').drawImage(logoImg, 0, 0);
-      const imgData = canvas.toDataURL('image/png');
-      doc.addImage(imgData, 'PNG', margin, 8, 22, 22);
+      const cv = document.createElement('canvas');
+      cv.width = logoImg.naturalWidth; cv.height = logoImg.naturalHeight;
+      cv.getContext('2d').drawImage(logoImg, 0, 0);
+      doc.addImage(cv.toDataURL('image/png'), 'PNG', margin, 8, 22, 22);
     }
-  } catch(e) { /* skip logo jika gagal */ }
+  } catch(e) {}
 
-  /* ---- Company Name & Doc Title ---- */
+  // Title box
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.setTextColor(...GOLD);
-  doc.text('PT GANDA ALAM MAKMUR', 44, 15);
+  doc.setFontSize(14);
+  doc.setTextColor(...BLACK);
+  doc.text('FORM ABSENSI PEMBICARAAN 5 MENIT', W / 2 + 10, 18, { align: 'center' });
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
-  doc.setTextColor(...LGRAY);
-  doc.text('Site Operations — Health & Safety Division', 44, 20);
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(13);
-  doc.setTextColor(...WHITE);
-  doc.text('LAPORAN ABSENSI P5M HARIAN', 44, 30);
-
-  /* ---- Doc Number & Tanggal ---- */
-  const docNo = `P5M-${row.nik || 'XXX'}-${(row.tanggal || '').replace(/-/g,'')}`;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7);
   doc.setTextColor(...GRAY);
-  doc.text(`No. Dokumen: ${docNo}`, W - margin, 24, { align: 'right' });
-  doc.text(`Tanggal Cetak: ${new Date().toLocaleDateString('id-ID', {day:'2-digit',month:'long',year:'numeric'})}`, W - margin, 28.5, { align: 'right' });
+  doc.text('PT GANDA ALAM MAKMUR', W / 2 + 10, 24, { align: 'center' });
 
-  let y = 46;
+  // Border header
+  doc.setDrawColor(...BLACK);
+  doc.setLineWidth(0.6);
+  doc.line(margin, 30, W - margin, 30);
 
-  /* ---- SECTION: Informasi Karyawan ---- */
-  const drawSection = (title, startY) => {
-    doc.setFillColor(12, 28, 22);
-    doc.roundedRect(margin, startY, colW, 7, 2, 2, 'F');
-    doc.setDrawColor(...GOLD);
-    doc.setLineWidth(0.4);
-    doc.line(margin + 3, startY + 3.5, margin + 6, startY + 3.5);
+  let y = 35;
+
+  /* ============================================================
+     INFO FIELDS (Hari/Tanggal, Waktu, Lokasi, Materi, Pembicara)
+     ============================================================ */
+  const infoFields = [
+    { label: 'Hari/Tanggal', value: tglStr },
+    { label: 'Waktu',        value: '-' },
+    { label: 'Lokasi',       value: 'HO' },
+    { label: 'Materi',       value: materiText },
+    { label: 'Pembicara',    value: pembicara },
+  ];
+
+  const labelX = margin;
+  const colonX = margin + 28;
+  const valueX = colonX + 4;
+  const lineH  = 6.5;
+
+  infoFields.forEach(f => {
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7.5);
+    doc.setFontSize(8);
     doc.setTextColor(...GOLD);
-    doc.text(title.toUpperCase(), margin + 9, startY + 4.8);
-    return startY + 10;
-  };
-
-  const drawField = (label, value, x, yPos, w) => {
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7);
-    doc.setTextColor(...GRAY);
-    doc.text(label, x, yPos);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8.5);
+    doc.text(f.label, labelX, y);
     doc.setTextColor(...BLACK);
-    doc.text(String(value || '-'), x, yPos + 5);
-    // underline
-    doc.setDrawColor(...LGRAY);
-    doc.setLineWidth(0.3);
-    doc.line(x, yPos + 6.5, x + w, yPos + 6.5);
-  };
-
-  // Section 1 — Informasi Karyawan
-  y = drawSection('Informasi Karyawan', y);
-  drawField('Tanggal Kegiatan', formatTanggal(row.tanggal), margin, y, colW / 3 - 3);
-  drawField('Nama Karyawan', row.nama, margin + colW/3, y, colW / 3 - 3);
-  drawField('NIK', row.nik, margin + (colW/3)*2, y, colW / 3);
-  y += 14;
-  drawField('Jabatan / Posisi', row.jabatan, margin, y, colW / 2 - 3);
-  drawField('Materi P5M', row.materi || '—', margin + colW/2, y, colW / 2);
-  y += 16;
-
-  // Section 2 — Kondisi Kesehatan
-  y = drawSection('Kondisi Kesehatan', y);
-  drawField('Jam Tidur Semalam', (row.jam_tidur != null ? row.jam_tidur + ' Jam' : '-'), margin, y, colW/4 - 3);
-  drawField('Status Kesehatan', row.status_kesehatan, margin + colW/4, y, colW/4 - 3);
-  drawField('Konsumsi Obat', row.konsumsi_obat, margin + colW/2, y, colW/4 - 3);
-  drawField('Rincian Obat / Keluhan', row.rincian_obat || '—', margin + (colW/4)*3, y, colW/4);
-  y += 14;
-  drawField('Tindakan Pengawas', row.tindakan_pengawas || '—', margin, y, colW);
-  y += 14;
-
-  // Section 3 — Catatan
-  y = drawSection('Catatan Tambahan', y);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  doc.setTextColor(...BLACK);
-  const catatanLines = doc.splitTextToSize(row.catatan || '—', colW);
-  doc.text(catatanLines, margin, y);
-  doc.setDrawColor(...LGRAY);
-  doc.setLineWidth(0.3);
-  doc.rect(margin, y - 4, colW, Math.max(14, catatanLines.length * 5));
-  y += Math.max(16, catatanLines.length * 5 + 4);
-
-  // Section 4 — Tanda Tangan Karyawan
-  y = drawSection('Tanda Tangan Karyawan', y);
-  const sigBoxH = 36;
-  doc.setDrawColor(...GOLD);
-  doc.setLineWidth(0.4);
-  doc.roundedRect(margin, y, colW / 2 - 5, sigBoxH, 2, 2);
-
-  if (row.signature_url) {
-    try {
-      const sigImg = new Image();
-      sigImg.crossOrigin = 'anonymous';
-      sigImg.src = row.signature_url;
-      await new Promise(res => { sigImg.onload = res; sigImg.onerror = res; });
-      if (sigImg.complete && sigImg.naturalWidth > 0) {
-        const sc = document.createElement('canvas');
-        sc.width = sigImg.naturalWidth; sc.height = sigImg.naturalHeight;
-        sc.getContext('2d').drawImage(sigImg, 0, 0);
-        doc.addImage(sc.toDataURL('image/png'), 'PNG', margin + 2, y + 2, colW/2 - 9, sigBoxH - 4, '', 'FAST');
-      }
-    } catch(e) {}
-  }
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7);
-  doc.setTextColor(...GRAY);
-  doc.text('Tanda tangan karyawan', margin + 2, y + sigBoxH + 4);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
-  doc.setTextColor(...BLACK);
-  doc.text(row.nama || '', margin + 2, y + sigBoxH + 9);
-
-  y += sigBoxH + 14;
-
-  /* ======================================
-     APPROVAL PENGAWAS (bottom section)
-     ====================================== */
-  // Garis emas pemisah
-  doc.setFillColor(...GOLD);
-  doc.rect(margin, y, colW, 0.6, 'F');
-  y += 5;
-
-  // Section header Approval
-  doc.setFillColor(8, 22, 16);
-  doc.roundedRect(margin, y, colW, 7, 2, 2, 'F');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.5);
-  doc.setTextColor(...GOLD);
-  doc.text('✦  PERSETUJUAN & APPROVAL PENGAWAS', margin + 4, y + 4.8);
-  y += 10;
-
-  // Approval boxes — 3 kolom: Nama, TTD, Tanggal
-  const apBoxW = (colW - 10) / 3;
-  const apBoxH = 38;
-
-  const labels = ['Nama Pengawas', 'Tanda Tangan Pengawas', 'Tanggal Persetujuan'];
-  const xPositions = [margin, margin + apBoxW + 5, margin + (apBoxW + 5) * 2];
-
-  labels.forEach((lbl, idx) => {
-    const bx = xPositions[idx];
-    doc.setDrawColor(...GOLD);
-    doc.setLineWidth(0.4);
-    doc.roundedRect(bx, y, apBoxW, apBoxH, 2, 2);
+    doc.text(':', colonX, y);
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(6.5);
-    doc.setTextColor(...GRAY);
-    doc.text(lbl.toUpperCase(), bx + apBoxW / 2, y + 5, { align: 'center' });
-    // Garis isian di dalam box
-    doc.setDrawColor(...LGRAY);
-    doc.setLineWidth(0.25);
-    for (let li = 0; li < 3; li++) {
-      doc.line(bx + 4, y + 16 + li * 7, bx + apBoxW - 4, y + 16 + li * 7);
-    }
+    doc.setTextColor(...BLACK);
+    const lines = doc.splitTextToSize(f.value, colW - (valueX - margin));
+    doc.text(lines, valueX, y);
+    y += lineH * Math.max(1, lines.length);
   });
 
-  // Note bawah
-  y += apBoxH + 6;
-  doc.setFont('helvetica', 'italic');
-  doc.setFontSize(6.5);
-  doc.setTextColor(...GRAY);
-  doc.text('Dokumen ini merupakan laporan resmi keselamatan kerja PT Ganda Alam Makmur. Harap dijaga kerahasiaannya.', W / 2, y, { align: 'center' });
+  y += 3;
 
-  // Footer line
-  y += 5;
-  doc.setFillColor(...DARK);
+  /* ============================================================
+     TABEL ABSENSI
+     ============================================================ */
+  // Column definitions (% of colW)
+  const cols = [
+    { h: 'NOMOR',             w: 0.055, a: 'center' },
+    { h: 'NAMA',              w: 0.175, a: 'left'   },
+    { h: 'NIK',               w: 0.105, a: 'center' },
+    { h: 'JABATAN',           w: 0.115, a: 'left'   },
+    { h: 'JAM\nTIDUR',        w: 0.07,  a: 'center' },
+    { h: 'KETERANGAN\nSEHAT',w: 0.08,  a: 'center' },
+    { h: 'KONSUMSI\nOBAT',   w: 0.085, a: 'center' },
+    { h: 'TINDAKAN\nPENGAWAS',w: 0.145, a: 'left'  },
+    { h: 'TTD',               w: 0.07,  a: 'center' },
+  ];
+  cols.forEach(c => c.pw = c.w * colW);
+
+  const tHeadH = 11;
+  const tRowH  = 8;
+  const minR   = 15;
+  const nRows  = Math.max(minR, rows.length);
+
+  // Header background
+  doc.setFillColor(...BLACK);
+  doc.rect(margin, y, colW, tHeadH, 'F');
+
+  // Header text
+  let cx = margin;
+  cols.forEach(col => {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(6);
+    doc.setTextColor(...WHITE);
+    const hLines = col.h.split('\n');
+    const baseY = y + (tHeadH - hLines.length * 3.5) / 2 + 2.5;
+    hLines.forEach((hl, hi) => {
+      doc.text(hl, cx + col.pw / 2, baseY + hi * 3.5, { align: 'center' });
+    });
+    cx += col.pw;
+  });
+
+  // Vertical header separators
+  cx = margin;
+  cols.forEach(col => {
+    doc.setDrawColor(...LGRAY);
+    doc.setLineWidth(0.2);
+    doc.line(cx, y, cx, y + tHeadH);
+    cx += col.pw;
+  });
+  doc.line(cx, y, cx, y + tHeadH); // right edge
+
+  y += tHeadH;
+
+  // Rows
+  for (let i = 0; i < nRows; i++) {
+    const r  = i < rows.length ? rows[i] : null;
+    const rY = y + i * tRowH;
+
+    // Alternate fill
+    if (i % 2 === 0) {
+      doc.setFillColor(248, 250, 248);
+      doc.rect(margin, rY, colW, tRowH, 'F');
+    }
+
+    if (r) {
+      const cells = [
+        String(i + 1),
+        r.nama || '',
+        r.nik  || '',
+        r.jabatan || '',
+        r.jam_tidur != null ? String(r.jam_tidur) : '',
+        r.status_kesehatan || '',
+        r.konsumsi_obat || '',
+        r.tindakan_pengawas || '',
+        '', // TTD — blank for signature
+      ];
+      let cellX = margin;
+      cells.forEach((txt, ci) => {
+        const cw = cols[ci].pw;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(6.5);
+        doc.setTextColor(...BLACK);
+        const tlines = doc.splitTextToSize(txt, cw - 2.5);
+        const tx = cols[ci].a === 'center' ? cellX + cw / 2 : cellX + 1.5;
+        doc.text(tlines[0] || '', tx, rY + tRowH / 2 + 2.2, { align: cols[ci].a });
+        cellX += cw;
+      });
+    }
+
+    // Row bottom line
+    doc.setDrawColor(...LGRAY);
+    doc.setLineWidth(0.2);
+    doc.line(margin, rY + tRowH, margin + colW, rY + tRowH);
+  }
+
+  // Vertical column lines through all rows
+  cx = margin;
+  cols.forEach(col => {
+    doc.setDrawColor(...LGRAY);
+    doc.setLineWidth(0.2);
+    doc.line(cx, y, cx, y + nRows * tRowH);
+    cx += col.pw;
+  });
+  doc.line(cx, y, cx, y + nRows * tRowH);
+
+  // Table outer border
+  doc.setDrawColor(...BLACK);
+  doc.setLineWidth(0.5);
+  doc.rect(margin, y - tHeadH, colW, tHeadH + nRows * tRowH);
+
+  y += nRows * tRowH + 6;
+
+  /* ============================================================
+     DOKUMENTASI (hanya jika ada Foreman)
+     ============================================================ */
+  if (hasForeman) {
+    // Cek page overflow
+    if (y + 70 > H - 15) { doc.addPage(); y = 14; }
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(...GOLD);
+    doc.text('Dokumentasi', margin, y + 5);
+    y += 8;
+
+    const photoBoxH = 55;
+    doc.setDrawColor(...BLACK);
+    doc.setLineWidth(0.5);
+    doc.rect(margin, y, colW, photoBoxH);
+
+    // 3 placeholder foto
+    const nPhoto = 3;
+    const pW = (colW - (nPhoto + 1) * 3) / nPhoto;
+    for (let p = 0; p < nPhoto; p++) {
+      const px = margin + 3 + p * (pW + 3);
+      doc.setDrawColor(...LGRAY);
+      doc.setLineWidth(0.3);
+      doc.setLineDashPattern([2, 2], 0);
+      doc.rect(px, y + 4, pW, photoBoxH - 8);
+      doc.setLineDashPattern([], 0);
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(6);
+      doc.setTextColor(...GRAY);
+      doc.text('[ Foto Dokumentasi ]', px + pW / 2, y + photoBoxH / 2 + 2, { align: 'center' });
+    }
+    y += photoBoxH + 6;
+  }
+
+  /* ============================================================
+     APPROVAL PENGAWAS
+     ============================================================ */
+  if (y + 50 > H - 15) { doc.addPage(); y = 14; }
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(...BLACK);
+  doc.text('Pengawas', margin, y + 6);
+  y += 10;
+
+  // Determine jumlah kotak approval
+  const apRows   = pengawasRows.length > 0 ? pengawasRows.slice(0, 3) : [null];
+  const nAp      = apRows.length;
+  const apGap    = 5;
+  const apW      = (colW - apGap * (nAp - 1)) / nAp;
+  const apH      = 40;
+
+  for (let ai = 0; ai < nAp; ai++) {
+    const sr = apRows[ai];
+    const bx = margin + ai * (apW + apGap);
+
+    doc.setDrawColor(...BLACK);
+    doc.setLineWidth(0.4);
+    doc.rect(bx, y, apW, apH);
+
+    // Signature image
+    if (sr && sr.signature_url) {
+      try {
+        const sImg = new Image();
+        sImg.crossOrigin = 'anonymous';
+        sImg.src = sr.signature_url;
+        await new Promise(r => { sImg.onload = r; sImg.onerror = r; });
+        if (sImg.complete && sImg.naturalWidth > 0) {
+          const sc = document.createElement('canvas');
+          sc.width = sImg.naturalWidth; sc.height = sImg.naturalHeight;
+          sc.getContext('2d').drawImage(sImg, 0, 0);
+          doc.addImage(sc.toDataURL('image/png'), 'PNG', bx + 2, y + 4, apW - 4, apH - 16, '', 'FAST');
+        }
+      } catch(e) {}
+    }
+
+    // Name line at bottom of box
+    doc.setDrawColor(...LGRAY);
+    doc.setLineWidth(0.2);
+    doc.line(bx + 4, y + apH - 10, bx + apW - 4, y + apH - 10);
+
+    doc.setFont('helvetica', sr && sr.nama ? 'bold' : 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(...BLACK);
+    doc.text(sr && sr.nama ? sr.nama : '(Nama Pengawas)', bx + apW / 2, y + apH - 5, { align: 'center' });
+  }
+
+  y += apH + 10;
+
+  /* ============================================================
+     FOOTER
+     ============================================================ */
+  doc.setFillColor(...BLACK);
   doc.rect(0, H - 10, W, 10, 'F');
-  doc.setFillColor(...GOLD);
-  doc.rect(0, H - 10, W, 0.5, 'F');
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6.5);
-  doc.setTextColor(...GRAY);
-  doc.text('PT Ganda Alam Makmur  |  Sistem Manajemen K3  |  P5M & Checklist Tools', W / 2, H - 4, { align: 'center' });
-  doc.text(`Halaman 1 dari 1`, W - margin, H - 4, { align: 'right' });
+  doc.setTextColor(180, 180, 180);
+  doc.text('PT Ganda Alam Makmur  |  Sistem Manajemen K3  |  Form Absensi P5M', W / 2, H - 4, { align: 'center' });
+  doc.text('Halaman 1 dari 1', W - margin, H - 4, { align: 'right' });
 
-  /* ---- Save PDF ---- */
-  const fileName = `P5M_${(row.nama || 'Karyawan').replace(/\s+/g,'_')}_${row.tanggal || 'nodate'}.pdf`;
-  doc.save(fileName);
+  /* ---- Save ---- */
+  doc.save(`P5M_Absensi_${row.tanggal || 'nodate'}.pdf`);
 }
+
