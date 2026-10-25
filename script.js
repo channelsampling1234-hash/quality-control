@@ -66,6 +66,11 @@ const _supa = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
             }
           }
 
+          // foto_urls sudah di-upload dari form, tinggal simpan array URL-nya
+          const fotoUrlsJson = formData.fotoUrls && formData.fotoUrls.length > 0
+            ? JSON.stringify(formData.fotoUrls)
+            : null;
+
           const { error } = await _supa.from('data_p5m').insert({
             tanggal:           formData.tanggal,
             nama:              formData.nama,
@@ -78,7 +83,8 @@ const _supa = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
             rincian_obat:      formData.rincianObat,
             tindakan_pengawas: formData.tindakanPengawas,
             catatan:           formData.catatan,
-            signature_url:     signatureUrl
+            signature_url:     signatureUrl,
+            foto_urls:         fotoUrlsJson
           });
 
           if (error) throw new Error(error.message);
@@ -136,8 +142,17 @@ const _supa = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
   let masterTools = [];
   let sigPadP5M, sigPadChk;
 
+  // ---- Utilitas: tanggal lokal (bukan UTC) ----
+  function getLocalDateStr() {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${dd}`;
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLocalDateStr();
     document.getElementById('p5m_tanggal').value = today;
     document.getElementById('chk_tanggal').value = today;
 
@@ -252,12 +267,53 @@ const _supa = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
         document.getElementById('group_materi').classList.remove('d-none');
       } else {
         document.getElementById('group_materi').classList.add('d-none');
+        // Clear foto jika bukan foreman
+        document.getElementById('p5m_foto_input').value = '';
+        document.getElementById('foto_preview_grid').innerHTML = '';
       }
     } else {
       document.getElementById('p5m_nik').value = '';
       document.getElementById('p5m_jabatan').value = '';
       document.getElementById('group_materi').classList.add('d-none');
     }
+  }
+
+  /* ==========================================
+     PREVIEW FOTO DOKUMENTASI
+     ========================================== */
+  function previewFoto(input) {
+    const grid = document.getElementById('foto_preview_grid');
+    grid.innerHTML = '';
+    const files = Array.from(input.files).slice(0, 5);
+    if (files.length === 0) return;
+    grid.style.display = 'grid';
+
+    files.forEach((file, idx) => {
+      const reader = new FileReader();
+      reader.onload = e => {
+        const wrap = document.createElement('div');
+        wrap.style.cssText = 'position:relative;border-radius:8px;overflow:hidden;aspect-ratio:1;';
+
+        const img = document.createElement('img');
+        img.src = e.target.result;
+        img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
+
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.innerHTML = '&times;';
+        del.style.cssText = 'position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:50%;border:none;background:rgba(220,50,50,0.85);color:#fff;font-size:0.9rem;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;';
+        del.onclick = () => { wrap.remove(); if (!grid.children.length) grid.style.display = 'none'; };
+
+        wrap.appendChild(img);
+        wrap.appendChild(del);
+        grid.appendChild(wrap);
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // Update drop zone label
+    document.getElementById('foto_drop_zone').querySelector('span').textContent =
+      `${files.length} foto dipilih — klik untuk ganti`;
   }
 
   function onSelectKaryawanChecklist() {
@@ -279,7 +335,7 @@ const _supa = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
     }
   }
 
-  document.getElementById('formP5M').addEventListener('submit', function (e) {
+  document.getElementById('formP5M').addEventListener('submit', async function (e) {
     e.preventDefault();
     if (sigPadP5M.isEmpty()) {
       Swal.fire("Peringatan", "Harap bubuhkan tanda tangan terlebih dahulu!", "warning");
@@ -287,12 +343,34 @@ const _supa = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
     }
     const btn = document.getElementById('btnSubmitP5M');
     btn.disabled = true;
-    btn.innerText = "Lagi menyimpan...";
+    btn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Menyimpan...';
+
+    // ---- Upload foto dokumentasi (foreman) ----
+    const jabatan = document.getElementById('p5m_jabatan').value;
+    let fotoUrls = [];
+    if (jabatan && jabatan.toLowerCase().includes('foreman')) {
+      const fotoInput = document.getElementById('p5m_foto_input');
+      const fotoFiles = Array.from(fotoInput.files).slice(0, 5);
+      for (const file of fotoFiles) {
+        try {
+          const ext  = file.name.split('.').pop();
+          const name = `foto_${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+          const { error: upErr } = await _supa.storage
+            .from('signatures')
+            .upload(name, file, { contentType: file.type, upsert: true });
+          if (!upErr) {
+            const { data: urlData } = _supa.storage.from('signatures').getPublicUrl(name);
+            fotoUrls.push(urlData.publicUrl);
+          }
+        } catch(err) { console.warn('foto upload error', err); }
+      }
+    }
+
     const formData = {
       tanggal: document.getElementById('p5m_tanggal').value,
       nama: document.getElementById('p5m_nama').value,
       nik: document.getElementById('p5m_nik').value,
-      jabatan: document.getElementById('p5m_jabatan').value,
+      jabatan: jabatan,
       materi: document.getElementById('p5m_materi').value,
       jamTidur: document.getElementById('p5m_jamTidur').value,
       statusKesehatan: document.getElementById('p5m_statusKesehatan').value,
@@ -300,20 +378,26 @@ const _supa = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
       rincianObat: document.getElementById('p5m_rincianObat').value,
       tindakanPengawas: document.getElementById('p5m_tindakanPengawas').value,
       catatan: document.getElementById('p5m_catatan').value,
-      signature: sigPadP5M.toDataURL()
+      signature: sigPadP5M.toDataURL(),
+      fotoUrls: fotoUrls
     };
+
     google.script.run.withSuccessHandler(res => {
       Swal.fire("Berhasil", res.message, "success");
       document.getElementById('formP5M').reset();
       sigPadP5M.clear();
       document.getElementById('group_keluhan').classList.add('d-none');
       document.getElementById('group_materi').classList.add('d-none');
+      document.getElementById('foto_preview_grid').innerHTML = '';
+      document.getElementById('foto_drop_zone').querySelector('span').textContent = 'Klik untuk pilih foto / ambil kamera';
+      // reset date
+      document.getElementById('p5m_tanggal').value = getLocalDateStr();
       btn.disabled = false;
-      btn.innerText = "Submit P5M";
+      btn.innerHTML = '<i class="bi bi-send-check me-2"></i>Submit P5M';
     }).withFailureHandler(err => {
       Swal.fire('Error', 'Gagal menyimpan: ' + err, 'error');
       btn.disabled = false;
-      btn.innerText = "Submit P5M";
+      btn.innerHTML = '<i class="bi bi-send-check me-2"></i>Submit P5M';
     }).submitP5M(formData);
   });
 
@@ -705,8 +789,31 @@ async function downloadPDFP5M(row) {
      DOKUMENTASI (hanya jika ada Foreman)
      ============================================================ */
   if (hasForeman) {
+    // Kumpulkan semua foto dari baris foreman
+    let allFotoUrls = [];
+    foremanRows.forEach(fr => {
+      if (fr.foto_urls) {
+        try {
+          const urls = typeof fr.foto_urls === 'string' ? JSON.parse(fr.foto_urls) : fr.foto_urls;
+          if (Array.isArray(urls)) allFotoUrls = allFotoUrls.concat(urls);
+        } catch(e) {}
+      }
+    });
+    // Deduplicate
+    allFotoUrls = [...new Set(allFotoUrls)].slice(0, 9);
+
+    const nPhoto   = Math.max(allFotoUrls.length, 3); // minimum 3 slot
+    const nCols    = Math.min(nPhoto, 3);
+    const photoGap = 3;
+    const pW       = (colW - photoGap * (nCols - 1)) / nCols;
+    const pH       = 50;
+
+    // Hitung berapa baris foto
+    const nPhotoRows = Math.ceil(nPhoto / nCols);
+    const dokBoxH    = nPhotoRows * (pH + photoGap) + 8;
+
     // Cek page overflow
-    if (y + 70 > H - 15) { doc.addPage(); y = 14; }
+    if (y + dokBoxH + 20 > H - 15) { doc.addPage(); y = 14; }
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
@@ -714,28 +821,53 @@ async function downloadPDFP5M(row) {
     doc.text('Dokumentasi', margin, y + 5);
     y += 8;
 
-    const photoBoxH = 55;
+    // Outer box
     doc.setDrawColor(...BLACK);
     doc.setLineWidth(0.5);
-    doc.rect(margin, y, colW, photoBoxH);
+    doc.rect(margin, y, colW, dokBoxH);
 
-    // 3 placeholder foto
-    const nPhoto = 3;
-    const pW = (colW - (nPhoto + 1) * 3) / nPhoto;
+    // Render tiap foto / placeholder
     for (let p = 0; p < nPhoto; p++) {
-      const px = margin + 3 + p * (pW + 3);
-      doc.setDrawColor(...LGRAY);
-      doc.setLineWidth(0.3);
-      doc.setLineDashPattern([2, 2], 0);
-      doc.rect(px, y + 4, pW, photoBoxH - 8);
-      doc.setLineDashPattern([], 0);
-      doc.setFont('helvetica', 'italic');
-      doc.setFontSize(6);
-      doc.setTextColor(...GRAY);
-      doc.text('[ Foto Dokumentasi ]', px + pW / 2, y + photoBoxH / 2 + 2, { align: 'center' });
+      const col = p % nCols;
+      const row2 = Math.floor(p / nCols);
+      const px = margin + 3 + col * (pW + photoGap);
+      const py = y + 4 + row2 * (pH + photoGap);
+      const url = allFotoUrls[p] || null;
+
+      if (url) {
+        try {
+          const fImg = new Image();
+          fImg.crossOrigin = 'anonymous';
+          fImg.src = url;
+          await new Promise(r => { fImg.onload = r; fImg.onerror = r; });
+          if (fImg.complete && fImg.naturalWidth > 0) {
+            const fc = document.createElement('canvas');
+            fc.width = fImg.naturalWidth; fc.height = fImg.naturalHeight;
+            fc.getContext('2d').drawImage(fImg, 0, 0);
+            doc.addImage(fc.toDataURL('image/jpeg'), 'JPEG', px, py, pW, pH, '', 'FAST');
+          } else {
+            // fallback placeholder
+            doc.setDrawColor(...LGRAY); doc.setLineWidth(0.3);
+            doc.setLineDashPattern([2,2],0); doc.rect(px, py, pW, pH); doc.setLineDashPattern([],0);
+            doc.setFont('helvetica','italic'); doc.setFontSize(6); doc.setTextColor(...GRAY);
+            doc.text('[ Foto ]', px + pW/2, py + pH/2 + 2, { align:'center' });
+          }
+        } catch(e) {
+          doc.setDrawColor(...LGRAY); doc.setLineWidth(0.3);
+          doc.setLineDashPattern([2,2],0); doc.rect(px, py, pW, pH); doc.setLineDashPattern([],0);
+          doc.setFont('helvetica','italic'); doc.setFontSize(6); doc.setTextColor(...GRAY);
+          doc.text('[ Foto ]', px + pW/2, py + pH/2 + 2, { align:'center' });
+        }
+      } else {
+        doc.setDrawColor(...LGRAY); doc.setLineWidth(0.3);
+        doc.setLineDashPattern([2,2],0); doc.rect(px, py, pW, pH); doc.setLineDashPattern([],0);
+        doc.setFont('helvetica','italic'); doc.setFontSize(6); doc.setTextColor(...GRAY);
+        doc.text('[ Foto Dokumentasi ]', px + pW/2, py + pH/2 + 2, { align:'center' });
+      }
     }
-    y += photoBoxH + 6;
+    y += dokBoxH + 6;
   }
+
 
   /* ============================================================
      APPROVAL PENGAWAS
