@@ -284,6 +284,7 @@ const _supa = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
   function previewFoto(input) {
     const grid = document.getElementById('foto_preview_grid');
     grid.innerHTML = '';
+    grid.style.display = 'none';
     const files = Array.from(input.files).slice(0, 5);
     if (files.length === 0) return;
     grid.style.display = 'grid';
@@ -302,7 +303,13 @@ const _supa = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
         del.type = 'button';
         del.innerHTML = '&times;';
         del.style.cssText = 'position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:50%;border:none;background:rgba(220,50,50,0.85);color:#fff;font-size:0.9rem;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;';
-        del.onclick = () => { wrap.remove(); if (!grid.children.length) grid.style.display = 'none'; };
+        del.onclick = () => {
+          wrap.remove();
+          if (!grid.children.length) {
+            grid.style.display = 'none';
+            document.getElementById('foto_drop_zone').querySelector('span').textContent = 'Klik untuk pilih foto / ambil kamera';
+          }
+        };
 
         wrap.appendChild(img);
         wrap.appendChild(del);
@@ -389,8 +396,8 @@ const _supa = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
       document.getElementById('group_keluhan').classList.add('d-none');
       document.getElementById('group_materi').classList.add('d-none');
       document.getElementById('foto_preview_grid').innerHTML = '';
+      document.getElementById('foto_preview_grid').style.display = 'none';
       document.getElementById('foto_drop_zone').querySelector('span').textContent = 'Klik untuk pilih foto / ambil kamera';
-      // reset date
       document.getElementById('p5m_tanggal').value = getLocalDateStr();
       btn.disabled = false;
       btn.innerHTML = '<i class="bi bi-send-check me-2"></i>Submit P5M';
