@@ -52,19 +52,11 @@ const _supa = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
       // Simpan data P5M ke Supabase
       async submitP5M(formData) {
         try {
-          // Upload signature ke Supabase Storage
-          let signatureUrl = null;
-          if (formData.signature && formData.signature.startsWith('data:')) {
-            const blob = await (await fetch(formData.signature)).blob();
-            const fileName = `p5m_${Date.now()}.png`;
-            const { data: uploadData, error: uploadErr } = await _supa.storage
-              .from('signatures')
-              .upload(fileName, blob, { contentType: 'image/png', upsert: true });
-            if (!uploadErr) {
-              const { data: urlData } = _supa.storage.from('signatures').getPublicUrl(fileName);
-              signatureUrl = urlData.publicUrl;
-            }
-          }
+          // Simpan signature sebagai base64 langsung ke DB (bypass CORS di PDF)
+          // Tidak perlu upload ke Storage — data: URL langsung digunakan di PDF & preview
+          const signatureBase64 = (formData.signature && formData.signature.startsWith('data:'))
+            ? formData.signature
+            : null;
 
           // foto_urls sudah di-upload dari form, tinggal simpan array URL-nya
           const fotoUrlsJson = formData.fotoUrls && formData.fotoUrls.length > 0
@@ -83,7 +75,7 @@ const _supa = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
             rincian_obat:      formData.rincianObat,
             tindakan_pengawas: formData.tindakanPengawas,
             catatan:           formData.catatan,
-            signature_url:     signatureUrl,
+            signature_url:     signatureBase64,
             foto_urls:         fotoUrlsJson
           });
 
@@ -608,10 +600,39 @@ async function downloadPDFP5M(row) {
   const pembicara    = foremanNames.length > 0 ? foremanNames.join(', ') : '-';
   const hasForeman   = foremanNames.length > 0;
 
-  /* ---- Helper: load image via fetch → base64 (bypass CORS canvas block) ---- */
-  async function loadImgAsDataUrl(url) {
+  /* ---- Helper: konversi gambar ke base64 untuk jsPDF ---- */
+  async function loadImgAsDataUrl(urlOrData) {
+    if (!urlOrData) return null;
+
+    // Sudah base64? Langsung pakai (signature baru disimpan sebagai base64)
+    if (urlOrData.startsWith('data:')) return urlOrData;
+
+    // URL dari Supabase Storage → pakai Supabase client .download() (bypass CORS)
+    if (urlOrData.includes('supabase.co/storage')) {
+      try {
+        // Ekstrak path setelah /public/signatures/ atau /object/public/signatures/
+        const match = urlOrData.match(/\/public\/([^?]+)/);
+        if (match) {
+          const fullPath = match[1]; // e.g. "signatures/foto_xxx.jpg"
+          const parts = fullPath.split('/');
+          const bucket = parts[0];
+          const filePath = parts.slice(1).join('/');
+          const { data: blob, error } = await _supa.storage.from(bucket).download(filePath);
+          if (!error && blob) {
+            return await new Promise(resolve => {
+              const reader = new FileReader();
+              reader.onload  = () => resolve(reader.result);
+              reader.onerror = () => resolve(null);
+              reader.readAsDataURL(blob);
+            });
+          }
+        }
+      } catch(e) { /* fallback ke fetch */ }
+    }
+
+    // Fallback: fetch biasa
     try {
-      const resp = await fetch(url);
+      const resp = await fetch(urlOrData);
       if (!resp.ok) return null;
       const blob = await resp.blob();
       return await new Promise(resolve => {
@@ -622,6 +643,7 @@ async function downloadPDFP5M(row) {
       });
     } catch(e) { return null; }
   }
+
 
   /* ---- Tanggal ---- */
   const tgl     = new Date(row.tanggal + 'T00:00:00');
