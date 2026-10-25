@@ -154,13 +154,31 @@
                 </div>
 
                 <!-- Materi P5M (Foreman only) -->
-                <div class="mb-3 d-none group-materi" id="group_materi">
+                <div class="d-none" id="group_materi">
                   <div class="form-divider"></div>
-                  <label class="form-label-premium" style="color:var(--emerald);">
-                    <i class="bi bi-journal-text me-1"></i>Materi P5M
-                    <span style="font-size:0.6rem;opacity:0.7;margin-left:6px;">KHUSUS FOREMAN</span>
-                  </label>
-                  <textarea class="form-control-premium" id="p5m_materi" rows="2" placeholder="Masukkan topik / materi pembicaraan..."></textarea>
+                  <div class="form-section">
+                    <div class="form-section-label" style="color:var(--emerald);"><i class="bi bi-journal-text me-1"></i>Materi & Dokumentasi <span style="font-size:0.6rem;opacity:0.7;margin-left:6px;">KHUSUS FOREMAN</span></div>
+
+                    <div class="mb-3">
+                      <label class="form-label-premium">Materi P5M</label>
+                      <textarea class="form-control-premium" id="p5m_materi" rows="2" placeholder="Masukkan topik / materi pembicaraan..."></textarea>
+                    </div>
+
+                    <!-- Foto Dokumentasi -->
+                    <div class="mb-3">
+                      <label class="form-label-premium">
+                        <i class="bi bi-camera me-1" style="color:var(--emerald);"></i>Foto Dokumentasi
+                        <span style="font-size:0.6rem;opacity:0.7;margin-left:6px;">Maks. 5 foto</span>
+                      </label>
+                      <div id="foto_drop_zone" onclick="document.getElementById('p5m_foto_input').click()" style="border:2px dashed var(--gold-border);border-radius:var(--radius-md);padding:20px;text-align:center;cursor:pointer;background:rgba(4,9,10,0.5);transition:var(--transition);" onmouseover="this.style.borderColor='var(--gold)'" onmouseout="this.style.borderColor='var(--gold-border)'">
+                        <i class="bi bi-cloud-upload" style="font-size:1.6rem;color:var(--gold-border);display:block;margin-bottom:8px;"></i>
+                        <span style="font-family:'Outfit',sans-serif;font-size:0.75rem;color:var(--text-muted);">Klik untuk pilih foto / ambil kamera</span>
+                      </div>
+                      <input type="file" id="p5m_foto_input" accept="image/*" multiple capture="environment" style="display:none;" onchange="previewFoto(this)">
+                      <!-- Preview Grid -->
+                      <div id="foto_preview_grid" style="display:none;margin-top:12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px;"></div>
+                    </div>
+                  </div>
                   <div class="form-divider"></div>
                 </div>
 
