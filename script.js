@@ -666,25 +666,36 @@ async function downloadPDFP5M(row) {
     }
   } catch(e) {}
 
-  // Title box
+  // Title
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(14);
+  doc.setFontSize(13);
   doc.setTextColor(...BLACK);
-  doc.text('FORM ABSENSI PEMBICARAAN 5 MENIT', W / 2 + 10, 18, { align: 'center' });
+  doc.text('FORM ABSENSI PEMBICARAAN 5 MENIT', W / 2 + 10, 16, { align: 'center' });
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
   doc.setTextColor(...GRAY);
-  doc.text('PT GANDA ALAM MAKMUR', W / 2 + 10, 24, { align: 'center' });
-
-  // Border header
+  doc.text('PT GANDA ALAM MAKMUR', W / 2 + 10, 22, { align: 'center' });
   doc.setDrawColor(...BLACK);
   doc.setLineWidth(0.6);
-  doc.line(margin, 30, W - margin, 30);
+  doc.line(margin, 27, W - margin, 27);
 
-  let y = 35;
+  // Logo (same-origin file, no CORS issue)
+  try {
+    const logoImg = new Image();
+    logoImg.src = 'logo_ptgam.png';
+    await new Promise(res => { logoImg.onload = res; logoImg.onerror = res; });
+    if (logoImg.complete && logoImg.naturalWidth > 0) {
+      const cv = document.createElement('canvas');
+      cv.width = logoImg.naturalWidth; cv.height = logoImg.naturalHeight;
+      cv.getContext('2d').drawImage(logoImg, 0, 0);
+      doc.addImage(cv.toDataURL('image/png'), 'PNG', margin, 6, 18, 18);
+    }
+  } catch(e) {}
+
+  let y = 31;
 
   /* ============================================================
-     INFO FIELDS (Hari/Tanggal, Waktu, Lokasi, Materi, Pembicara)
+     INFO FIELDS
      ============================================================ */
   const infoFields = [
     { label: 'Hari/Tanggal', value: tglStr },
@@ -697,11 +708,11 @@ async function downloadPDFP5M(row) {
   const labelX = margin;
   const colonX = margin + 28;
   const valueX = colonX + 4;
-  const lineH  = 6.5;
+  const lineH  = 5.5;
 
   infoFields.forEach(f => {
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
+    doc.setFontSize(7.5);
     doc.setTextColor(...GOLD);
     doc.text(f.label, labelX, y);
     doc.setTextColor(...BLACK);
@@ -709,35 +720,35 @@ async function downloadPDFP5M(row) {
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(...BLACK);
     const lines = doc.splitTextToSize(f.value, colW - (valueX - margin));
-    doc.text(lines, valueX, y);
-    y += lineH * Math.max(1, lines.length);
+    doc.text(lines[0] || '-', valueX, y);
+    y += lineH;
   });
 
   y += 3;
 
   /* ============================================================
-     TABEL ABSENSI
+     TABEL ABSENSI — compact single-page
      ============================================================ */
-  // Column definitions (% of colW)
   const cols = [
-    { h: 'NOMOR',             w: 0.055, a: 'center' },
-    { h: 'NAMA',              w: 0.175, a: 'left'   },
-    { h: 'NIK',               w: 0.105, a: 'center' },
-    { h: 'JABATAN',           w: 0.115, a: 'left'   },
-    { h: 'JAM\nTIDUR',        w: 0.07,  a: 'center' },
-    { h: 'KETERANGAN\nSEHAT',w: 0.08,  a: 'center' },
-    { h: 'KONSUMSI\nOBAT',   w: 0.085, a: 'center' },
-    { h: 'TINDAKAN\nPENGAWAS',w: 0.145, a: 'left'  },
-    { h: 'TTD',               w: 0.07,  a: 'center' },
+    { h: 'NO',               w: 0.050, a: 'center' },
+    { h: 'NAMA',             w: 0.175, a: 'left'   },
+    { h: 'NIK',              w: 0.110, a: 'center' },
+    { h: 'JABATAN',          w: 0.110, a: 'left'   },
+    { h: 'JAM\nTIDUR',       w: 0.065, a: 'center' },
+    { h: 'KET.\nSEHAT',      w: 0.075, a: 'center' },
+    { h: 'KONSUMSI\nOBAT',   w: 0.080, a: 'center' },
+    { h: 'TINDAKAN\nPENGAWAS',w: 0.135, a: 'left'  },
+    { h: 'TTD',              w: 0.100, a: 'center' },
   ];
   cols.forEach(c => c.pw = c.w * colW);
 
-  const tHeadH = 11;
-  const tRowH  = 8;
-  const minR   = 15;
+  const tHeadH = 10;
+  const tRowH  = 6.5;
+  // Minimal baris = data asli (min 8 baris, max 15)
+  const minR   = Math.min(Math.max(rows.length, 8), 15);
   const nRows  = Math.max(minR, rows.length);
 
-  // Header background
+  // Header bg
   doc.setFillColor(...BLACK);
   doc.rect(margin, y, colW, tHeadH, 'F');
 
@@ -745,12 +756,12 @@ async function downloadPDFP5M(row) {
   let cx = margin;
   cols.forEach(col => {
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(6);
+    doc.setFontSize(5.5);
     doc.setTextColor(...WHITE);
     const hLines = col.h.split('\n');
-    const baseY = y + (tHeadH - hLines.length * 3.5) / 2 + 2.5;
+    const baseY = y + (tHeadH - hLines.length * 3) / 2 + 2.2;
     hLines.forEach((hl, hi) => {
-      doc.text(hl, cx + col.pw / 2, baseY + hi * 3.5, { align: 'center' });
+      doc.text(hl, cx + col.pw / 2, baseY + hi * 3, { align: 'center' });
     });
     cx += col.pw;
   });
@@ -758,21 +769,18 @@ async function downloadPDFP5M(row) {
   // Vertical header separators
   cx = margin;
   cols.forEach(col => {
-    doc.setDrawColor(...LGRAY);
-    doc.setLineWidth(0.2);
+    doc.setDrawColor(...LGRAY); doc.setLineWidth(0.2);
     doc.line(cx, y, cx, y + tHeadH);
     cx += col.pw;
   });
-  doc.line(cx, y, cx, y + tHeadH); // right edge
-
+  doc.line(cx, y, cx, y + tHeadH);
   y += tHeadH;
 
-  // Rows
+  // Data rows
   for (let i = 0; i < nRows; i++) {
     const r  = i < rows.length ? rows[i] : null;
     const rY = y + i * tRowH;
 
-    // Alternate fill
     if (i % 2 === 0) {
       doc.setFillColor(248, 250, 248);
       doc.rect(margin, rY, colW, tRowH, 'F');
@@ -781,56 +789,59 @@ async function downloadPDFP5M(row) {
     if (r) {
       const cells = [
         String(i + 1),
-        r.nama || '',
-        r.nik  || '',
-        r.jabatan || '',
+        r.nama     || '',
+        r.nik      || '',
+        r.jabatan  || '',
         r.jam_tidur != null ? String(r.jam_tidur) : '',
         r.status_kesehatan || '',
-        r.konsumsi_obat || '',
+        r.konsumsi_obat    || '',
         r.tindakan_pengawas || '',
-        '', // TTD — blank for signature
+        '',
       ];
       let cellX = margin;
       cells.forEach((txt, ci) => {
         const cw = cols[ci].pw;
         doc.setFont('helvetica', 'normal');
-        doc.setFontSize(6.5);
+        doc.setFontSize(6);
         doc.setTextColor(...BLACK);
-        const tlines = doc.splitTextToSize(txt, cw - 2.5);
         const tx = cols[ci].a === 'center' ? cellX + cw / 2 : cellX + 1.5;
-        doc.text(tlines[0] || '', tx, rY + tRowH / 2 + 2.2, { align: cols[ci].a });
+        const tlines = doc.splitTextToSize(txt, cw - 2);
+        doc.text(tlines[0] || '', tx, rY + tRowH / 2 + 1.8, { align: cols[ci].a });
         cellX += cw;
       });
     }
 
-    // Row bottom line
-    doc.setDrawColor(...LGRAY);
-    doc.setLineWidth(0.2);
+    doc.setDrawColor(...LGRAY); doc.setLineWidth(0.2);
     doc.line(margin, rY + tRowH, margin + colW, rY + tRowH);
   }
 
-  // Vertical column lines through all rows
+  // Vertical col lines + outer border
   cx = margin;
   cols.forEach(col => {
-    doc.setDrawColor(...LGRAY);
-    doc.setLineWidth(0.2);
+    doc.setDrawColor(...LGRAY); doc.setLineWidth(0.2);
     doc.line(cx, y, cx, y + nRows * tRowH);
     cx += col.pw;
   });
   doc.line(cx, y, cx, y + nRows * tRowH);
-
-  // Table outer border
-  doc.setDrawColor(...BLACK);
-  doc.setLineWidth(0.5);
+  doc.setDrawColor(...BLACK); doc.setLineWidth(0.5);
   doc.rect(margin, y - tHeadH, colW, tHeadH + nRows * tRowH);
 
-  y += nRows * tRowH + 6;
+  y += nRows * tRowH + 5;
+
+  /* ============================================================
+     HELPER: deteksi format gambar dari data URL
+     ============================================================ */
+  function imgFmt(dataUrl) {
+    if (!dataUrl) return 'PNG';
+    if (dataUrl.startsWith('data:image/jpeg') || dataUrl.startsWith('data:image/jpg')) return 'JPEG';
+    if (dataUrl.startsWith('data:image/webp')) return 'WEBP';
+    return 'PNG';
+  }
 
   /* ============================================================
      DOKUMENTASI (hanya jika ada Foreman)
      ============================================================ */
   if (hasForeman) {
-    // Kumpulkan semua foto dari baris foreman
     let allFotoUrls = [];
     foremanRows.forEach(fr => {
       if (fr.foto_urls) {
@@ -840,137 +851,119 @@ async function downloadPDFP5M(row) {
         } catch(e) {}
       }
     });
-    // Deduplicate
-    allFotoUrls = [...new Set(allFotoUrls)].slice(0, 9);
+    allFotoUrls = [...new Set(allFotoUrls)].slice(0, 6);
 
-    const nPhoto   = Math.max(allFotoUrls.length, 3); // minimum 3 slot
-    const nCols    = Math.min(nPhoto, 3);
+    const nPhoto   = Math.max(allFotoUrls.length, 3);
+    const nCols    = 3;
     const photoGap = 3;
     const pW       = (colW - photoGap * (nCols - 1)) / nCols;
-    const pH       = 50;
-
-    // Hitung berapa baris foto
-    const nPhotoRows = Math.ceil(nPhoto / nCols);
-    const dokBoxH    = nPhotoRows * (pH + photoGap) + 8;
-
-    // Cek page overflow
-    if (y + dokBoxH + 20 > H - 15) { doc.addPage(); y = 14; }
+    const pH       = 38;                             // Compact: 38mm
+    const nPhRows  = Math.ceil(nPhoto / nCols);
+    const dokBoxH  = nPhRows * (pH + photoGap) + 6;
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
+    doc.setFontSize(7.5);
     doc.setTextColor(...GOLD);
     doc.text('Dokumentasi', margin, y + 5);
     y += 8;
 
-    // Outer box
-    doc.setDrawColor(...BLACK);
-    doc.setLineWidth(0.5);
+    doc.setDrawColor(...BLACK); doc.setLineWidth(0.5);
     doc.rect(margin, y, colW, dokBoxH);
 
-    // Render tiap foto / placeholder
     for (let p = 0; p < nPhoto; p++) {
-      const col = p % nCols;
-      const row2 = Math.floor(p / nCols);
-      const px = margin + 3 + col * (pW + photoGap);
-      const py = y + 4 + row2 * (pH + photoGap);
-      const url = allFotoUrls[p] || null;
+      const col2   = p % nCols;
+      const row2   = Math.floor(p / nCols);
+      const px     = margin + 2 + col2 * (pW + photoGap);
+      const py     = y + 3 + row2 * (pH + photoGap);
+      const url    = allFotoUrls[p] || null;
 
       if (url) {
         const dataUrl = await loadImgAsDataUrl(url);
         if (dataUrl) {
-          try {
-            const ext = dataUrl.startsWith('data:image/png') ? 'PNG' : 'JPEG';
-            doc.addImage(dataUrl, ext, px, py, pW, pH, '', 'FAST');
-          } catch(e) {
+          try { doc.addImage(dataUrl, imgFmt(dataUrl), px, py, pW, pH, '', 'FAST'); }
+          catch(e) {
             doc.setDrawColor(...LGRAY); doc.setLineWidth(0.3);
             doc.setLineDashPattern([2,2],0); doc.rect(px, py, pW, pH); doc.setLineDashPattern([],0);
-            doc.setFont('helvetica','italic'); doc.setFontSize(6); doc.setTextColor(...GRAY);
-            doc.text('[ Foto gagal ]', px + pW/2, py + pH/2 + 2, { align:'center' });
+            doc.setFont('helvetica','italic'); doc.setFontSize(5.5); doc.setTextColor(...GRAY);
+            doc.text('[ gagal load ]', px + pW/2, py + pH/2 + 2, { align:'center' });
           }
         } else {
           doc.setDrawColor(...LGRAY); doc.setLineWidth(0.3);
           doc.setLineDashPattern([2,2],0); doc.rect(px, py, pW, pH); doc.setLineDashPattern([],0);
-          doc.setFont('helvetica','italic'); doc.setFontSize(6); doc.setTextColor(...GRAY);
+          doc.setFont('helvetica','italic'); doc.setFontSize(5.5); doc.setTextColor(...GRAY);
           doc.text('[ Foto ]', px + pW/2, py + pH/2 + 2, { align:'center' });
         }
       } else {
         doc.setDrawColor(...LGRAY); doc.setLineWidth(0.3);
         doc.setLineDashPattern([2,2],0); doc.rect(px, py, pW, pH); doc.setLineDashPattern([],0);
-        doc.setFont('helvetica','italic'); doc.setFontSize(6); doc.setTextColor(...GRAY);
+        doc.setFont('helvetica','italic'); doc.setFontSize(5.5); doc.setTextColor(...GRAY);
         doc.text('[ Foto Dokumentasi ]', px + pW/2, py + pH/2 + 2, { align:'center' });
       }
     }
-    y += dokBoxH + 6;
+    y += dokBoxH + 5;
   }
 
-
   /* ============================================================
-     APPROVAL PENGAWAS
-     Pengawas = Foreman yang memimpin P5M (bisa lebih dari 1)
+     APPROVAL PENGAWAS (Foreman = Pengawas P5M)
      ============================================================ */
-  if (y + 50 > H - 15) { doc.addPage(); y = 14; }
-
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
+  doc.setFontSize(7.5);
   doc.setTextColor(...BLACK);
-  doc.text('Pengawas', margin, y + 6);
-  y += 10;
+  doc.text('Pengawas', margin, y + 5);
+  y += 8;
 
-  // Gunakan foremanRows sebagai Pengawas (maks 3 kotak)
   const apRows = foremanRows.length > 0 ? foremanRows.slice(0, 3) : [null];
   const nAp    = apRows.length;
-  const apGap  = 5;
+  const apGap  = 4;
   const apW    = (colW - apGap * (nAp - 1)) / nAp;
-  const apH    = 40;
+  const apH    = 30;                                 // Compact: 30mm
 
   for (let ai = 0; ai < nAp; ai++) {
     const sr = apRows[ai];
     const bx = margin + ai * (apW + apGap);
 
-    doc.setDrawColor(...BLACK);
-    doc.setLineWidth(0.4);
+    doc.setDrawColor(...BLACK); doc.setLineWidth(0.4);
     doc.rect(bx, y, apW, apH);
 
-    // Load & render signature via fetch (bukan canvas crossOrigin)
+    // Render signature (data: URL langsung, atau load dari Supabase)
     if (sr && sr.signature_url) {
-      const sigDataUrl = await loadImgAsDataUrl(sr.signature_url);
-      if (sigDataUrl) {
+      const sigData = await loadImgAsDataUrl(sr.signature_url);
+      if (sigData) {
         try {
-          doc.addImage(sigDataUrl, 'PNG', bx + 2, y + 3, apW - 4, apH - 14, '', 'FAST');
+          doc.addImage(sigData, imgFmt(sigData), bx + 2, y + 2, apW - 4, apH - 11, '', 'FAST');
         } catch(e) {}
       }
     }
 
-    // Garis nama
-    doc.setDrawColor(...LGRAY);
-    doc.setLineWidth(0.2);
-    doc.line(bx + 4, y + apH - 10, bx + apW - 4, y + apH - 10);
-
+    // Garis & nama
+    doc.setDrawColor(...LGRAY); doc.setLineWidth(0.2);
+    doc.line(bx + 3, y + apH - 8, bx + apW - 3, y + apH - 8);
     doc.setFont('helvetica', sr && sr.nama ? 'bold' : 'normal');
-    doc.setFontSize(7);
+    doc.setFontSize(6.5);
     doc.setTextColor(...BLACK);
     doc.text(
       sr && sr.nama ? sr.nama : '(Nama Pengawas)',
-      bx + apW / 2,
-      y + apH - 5,
+      bx + apW / 2, y + apH - 3,
       { align: 'center' }
     );
   }
 
-  y += apH + 10;
+  y += apH + 4;
 
   /* ============================================================
      FOOTER
      ============================================================ */
   doc.setFillColor(...BLACK);
-  doc.rect(0, H - 10, W, 10, 'F');
+  doc.rect(0, H - 9, W, 9, 'F');
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(6.5);
+  doc.setFontSize(6);
   doc.setTextColor(180, 180, 180);
-  doc.text('PT Ganda Alam Makmur  |  Sistem Manajemen K3  |  Form Absensi P5M', W / 2, H - 4, { align: 'center' });
-  doc.text('Halaman 1 dari 1', W - margin, H - 4, { align: 'right' });
+  doc.text('PT Ganda Alam Makmur  |  Sistem Manajemen K3  |  Form Absensi P5M', W / 2, H - 3.5, { align: 'center' });
 
   /* ---- Save ---- */
   doc.save(`P5M_Absensi_${row.tanggal || 'nodate'}.pdf`);
 }
+
+
+
 
